@@ -3,7 +3,6 @@ import makeWASocket, {
   useMultiFileAuthState,
   getContentType
 } from "@whiskeysockets/baileys";
-import makeInMemoryStore from "@whiskeysockets/baileys";
 import pino from "pino";
 import qrcode from "qrcode-terminal";
 import type { Router } from "../../core/router.js";
@@ -15,15 +14,11 @@ export async function startWhatsAppChannel(
 ): Promise<void> {
   const { state, saveCreds } = await useMultiFileAuthState(authDir);
   const { version } = await fetchLatestBaileysVersion();
-  const store = makeInMemoryStore({ logger: pino({ level: "silent" }) });
-
   const sock = makeWASocket({
     version,
     auth: state,
     logger: pino({ level: "silent" })
   });
-
-  store.bind(sock.ev);
 
   sock.ev.on("creds.update", saveCreds);
 

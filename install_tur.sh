@@ -5,6 +5,9 @@ APP_NAME="AgentTUR"
 DEFAULT_BRANCH="main"
 REPO_URL="https://github.com/LucasBolla94/agent.git"
 INSTALL_DIR=""
+NON_INTERACTIVE="false"
+REINSTALL="false"
+KEEP="false"
 
 banner() {
   cat <<'EOF'
@@ -29,7 +32,7 @@ usage() {
 ${APP_NAME} installer
 
 Usage:
-  ./install_tur.sh --repo <git_url> [--dir <install_dir>] [--branch <branch>]
+  ./install_tur.sh --repo <git_url> [--dir <install_dir>] [--branch <branch>] [--yes] [--reinstall|--keep]
 
 Example:
   ./install_tur.sh --repo https://github.com/yourorg/OpenTur.git --dir /opt/agenttur
@@ -49,6 +52,18 @@ while [[ $# -gt 0 ]]; do
     --branch)
       DEFAULT_BRANCH="$2"
       shift 2
+      ;;
+    --yes)
+      NON_INTERACTIVE="true"
+      shift 1
+      ;;
+    --reinstall)
+      REINSTALL="true"
+      shift 1
+      ;;
+    --keep)
+      KEEP="true"
+      shift 1
       ;;
     -h|--help)
       usage
@@ -93,7 +108,7 @@ install_deps_debian() {
     if sudo apt-get install -y docker.io docker-compose-plugin; then
       true
     else
-      say "docker-compose-plugin indisponível. Instalando docker-compose clássico."
+      say "docker-compose-plugin unavailable. Installing classic docker-compose."
       sudo apt-get install -y docker.io docker-compose
     fi
     sudo systemctl enable --now docker
@@ -138,30 +153,39 @@ detect_and_install() {
 }
 
 banner
-say "Oi! Vou cuidar da instalação do ${APP_NAME} pra você."
-say "Posso demorar alguns minutos. Vamos juntos!"
+say "Oi! Vou cuidar da instalacao do ${APP_NAME} pra voce."
+say "Isso pode demorar alguns minutos. Vamos juntos."
 
 detect_and_install
 
 if [[ -d "$INSTALL_DIR" ]]; then
   say "Pasta encontrada: $INSTALL_DIR"
-  echo "Esse arquivo já está instalado. Você gostaria de:"
-  echo "  1) Deletar e reinstalar"
-  echo "  2) Manter tudo (apenas atualizar)"
-  read -r -p "> " choice
+  if [[ "$REINSTALL" == "true" ]]; then
+    choice="1"
+  elif [[ "$KEEP" == "true" ]]; then
+    choice="2"
+  elif [[ "$NON_INTERACTIVE" == "true" ]]; then
+    choice="2"
+  else
+    echo "Esse arquivo ja esta instalado. Voce gostaria de:"
+    echo "  1) Deletar e reinstalar"
+    echo "  2) Manter tudo (apenas atualizar)"
+    read -r -p "> " choice
+  fi
+
   if [[ "$choice" == "1" ]]; then
-    say "Removendo instalação antiga..."
+    say "Removendo instalacao antiga..."
     sudo rm -rf "$INSTALL_DIR"
     sudo mkdir -p "$INSTALL_DIR"
     sudo chown "$USER":"$USER" "$INSTALL_DIR"
-    say "Baixando o repositório..."
+    say "Baixando o repositorio..."
     git clone --branch "$DEFAULT_BRANCH" "$REPO_URL" "$INSTALL_DIR"
   else
     say "Mantendo arquivos e atualizando..."
     if [[ -d "$INSTALL_DIR/.git" ]]; then
       git -C "$INSTALL_DIR" pull
     else
-      say "Repositório ausente. Fazendo clone limpo..."
+      say "Repositorio ausente. Fazendo clone limpo..."
       git clone --branch "$DEFAULT_BRANCH" "$REPO_URL" "$INSTALL_DIR"
     fi
   fi
@@ -173,7 +197,7 @@ else
     sudo mkdir -p "$INSTALL_DIR"
     sudo chown "$USER":"$USER" "$INSTALL_DIR"
   fi
-  say "Baixando o repositório..."
+  say "Baixando o repositorio..."
   git clone --branch "$DEFAULT_BRANCH" "$REPO_URL" "$INSTALL_DIR"
 fi
 
@@ -190,6 +214,6 @@ else
   sudo npm install -g .
 fi
 
-say "Instalação concluída!"
+say "Instalacao concluida!"
 say "Agora execute: turion setup"
 say "Se precisar entrar na pasta: cd $INSTALL_DIR"
