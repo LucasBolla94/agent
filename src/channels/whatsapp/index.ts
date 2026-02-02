@@ -18,6 +18,7 @@ const NOISY_LOG_PATTERNS = [
   /Failed to decrypt message with any known session/i,
   /Bad MAC/i
 ];
+const notifiedNumbers = new Set<string>();
 
 export async function startWhatsAppChannel(
   router: Router,
@@ -167,11 +168,13 @@ async function notifyAuthorizedUsers(
   sock: ReturnType<typeof makeWASocket>,
   authNumbers: string[]
 ): Promise<void> {
-  const text = "Turion conectado. Tudo pronto. Agora voce pode usar o WhatsApp para comandos.";
   for (const number of authNumbers) {
+    if (notifiedNumbers.has(number)) continue;
     const jid = `${number}@s.whatsapp.net`;
+    const text = `Eiii ${number}, estamos quase la !!`;
     try {
       await sock.sendMessage(jid, { text });
+      notifiedNumbers.add(number);
     } catch (err) {
       const message = err instanceof Error ? err.message : "unknown";
       console.log(`Falha ao notificar ${number}: ${message}`);
