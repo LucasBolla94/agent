@@ -8,6 +8,7 @@ type SetupAnswers = {
   authNumbers: string;
   enableWhatsapp: boolean;
   enableTui: boolean;
+  runAsService: boolean;
   auditLogPath: string;
   waAuthDir: string;
 };
@@ -70,11 +71,18 @@ export async function runSetupWizard(): Promise<void> {
       "./data/wa_auth"
     );
 
+    const runAsService = await askYesNo(
+      rl,
+      "7) Rodar em segundo plano (systemd) apos conectar? (Y/n)\n> ",
+      true
+    );
+
     const answers: SetupAnswers = {
       ownerNumber,
       authNumbers,
       enableWhatsapp,
       enableTui,
+      runAsService,
       auditLogPath,
       waAuthDir
     };
@@ -84,12 +92,15 @@ export async function runSetupWizard(): Promise<void> {
 
     const startNow = await askYesNo(
       rl,
-      "7) Deseja iniciar o servidor agora para conectar via QR Code? (Y/n)\n> ",
+      "8) Deseja iniciar o servidor agora para conectar via QR Code? (Y/n)\n> ",
       true
     );
 
     if (startNow) {
-      await startServer();
+      await startServer({
+        enableWhatsapp,
+        runAsService
+      });
     } else {
       console.log("Pronto. Quando quiser iniciar: npm run start (ou node dist/index.js).");
     }
@@ -112,7 +123,10 @@ function writeEnvFile(answers: SetupAnswers): void {
   fs.writeFileSync(envPath, lines.join("\n") + "\n", "utf8");
 }
 
-async function startServer(): Promise<void> {
+async function startServer(options: {
+  enableWhatsapp: boolean;
+  runAsService: boolean;
+}): Promise<void> {
   const distPath = path.join(process.cwd(), "dist", "index.js");
   if (!fs.existsSync(distPath)) {
     console.log("Build não encontrado. Rode: npm run build");
@@ -122,7 +136,39 @@ async function startServer(): Promise<void> {
   console.log("\nIniciando servidor...");
   console.log("Se for a primeira vez, o QR Code vai aparecer aqui.");
 
-  const child = spawn("node", [distPath], { stdio: "inherit" });
+  if (!options.runAsService) {
+    const child = spawn("node", [distPath], { stdio: "inherit" });
+    await new Promise<void>((resolve) => {
+      child.on("exit", () => resolve());
+    });
+    return;
+  }
+
+  const child = spawn("node", [distPath], { stdio: ["inherit", "pipe", "pipe"] });
+  const onData = (chunk: Buffer) => {
+    const text = chunk.toString();
+    process.stdout.write(text);
+    if (!options.enableWhatsapp) return;
+    if (text.includes("WhatsApp conectado.") || text.includes("WhatsApp connected.")) {
+      promoteToService();
+    }
+  };
+  child.stdout?.on("data", onData);
+  child.stderr?.on("data", (chunk: Buffer) => {
+    process.stderr.write(chunk.toString());
+  });
+
+  const promoteToService = () => {
+    child.stdout?.off("data", onData);
+    console.log("\nConexao feita. Iniciando em segundo plano...");
+    const systemctl = spawn("sudo", ["systemctl", "enable", "--now", "agenttur"], {
+      stdio: "inherit"
+    });
+    systemctl.on("exit", () => {
+      child.kill("SIGINT");
+    });
+  };
+
   await new Promise<void>((resolve) => {
     child.on("exit", () => resolve());
   });

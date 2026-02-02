@@ -245,6 +245,26 @@ exec "$NODE_BIN" "$INSTALL_DIR/dist/cli/turion.js" "\$@"
 EOF
 sudo chmod +x /usr/local/bin/turion
 
+SERVICE_PATH="/etc/systemd/system/agenttur.service"
+sudo tee "$SERVICE_PATH" >/dev/null <<EOF
+[Unit]
+Description=AgentTUR service
+After=network.target
+
+[Service]
+Type=simple
+User=$TARGET_USER
+WorkingDirectory=$INSTALL_DIR
+ExecStart=$NODE_BIN $INSTALL_DIR/dist/index.js
+Restart=always
+RestartSec=3
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload
+
 say "Instalacao concluida!"
 if [[ -e /dev/tty ]]; then
   say "Iniciando setup agora..."
