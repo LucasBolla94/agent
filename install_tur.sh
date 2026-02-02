@@ -33,7 +33,7 @@ usage() {
 ${APP_NAME} installer
 
 Usage:
-  ./install_tur.sh --repo <git_url> [--dir <install_dir>] [--branch <branch>] [--yes] [--reinstall|--keep]
+  ./install_tur.sh --repo <git_url> [--dir <install_dir>] [--branch <branch>] [--yes]
 
 Example:
   ./install_tur.sh --repo https://github.com/yourorg/OpenTur.git --dir /opt/agenttur
@@ -170,7 +170,7 @@ if [[ -d "$INSTALL_DIR" ]]; then
   elif [[ "$KEEP" == "true" ]]; then
     choice="2"
   elif [[ "$NON_INTERACTIVE" == "true" ]]; then
-    choice="2"
+    choice="1"
   else
     echo "Esse arquivo ja esta instalado. Voce gostaria de:"
     echo "  1) Deletar e reinstalar"
@@ -208,17 +208,15 @@ fi
 
 cd "$INSTALL_DIR"
 sudo chown -R "$TARGET_USER":"$TARGET_USER" "$INSTALL_DIR"
+
 npm config set fund false
 npm config set audit false
 npm install
 npm run build
 npm prune --omit=dev
 
-if [[ "$(id -u)" -eq 0 ]]; then
-  npm install -g .
-else
-  sudo npm install -g .
-fi
+sudo ln -sf "$INSTALL_DIR/dist/cli/turion.js" /usr/local/bin/turion
+sudo chmod +x /usr/local/bin/turion
 
 say "Instalacao concluida!"
 say "Agora execute: turion setup"
