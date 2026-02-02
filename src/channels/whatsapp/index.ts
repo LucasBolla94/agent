@@ -5,6 +5,7 @@ import makeWASocket, {
 } from "@whiskeysockets/baileys";
 import makeInMemoryStore from "@whiskeysockets/baileys";
 import pino from "pino";
+import qrcode from "qrcode-terminal";
 import type { Router } from "../../core/router.js";
 
 export async function startWhatsAppChannel(
@@ -19,7 +20,6 @@ export async function startWhatsAppChannel(
   const sock = makeWASocket({
     version,
     auth: state,
-    printQRInTerminal: true,
     logger: pino({ level: "silent" })
   });
 
@@ -28,7 +28,11 @@ export async function startWhatsAppChannel(
   sock.ev.on("creds.update", saveCreds);
 
   sock.ev.on("connection.update", async (update) => {
-    const { connection, lastDisconnect } = update;
+    const { connection, lastDisconnect, qr } = update;
+    if (qr) {
+      console.log("QR Code para conexão WhatsApp:");
+      qrcode.generate(qr, { small: true });
+    }
     if (connection === "close") {
       const reason = (lastDisconnect?.error as { message?: string })?.message ?? "unknown";
       console.log(`WhatsApp connection closed: ${reason}`);

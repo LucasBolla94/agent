@@ -4,7 +4,7 @@ set -euo pipefail
 APP_NAME="AgentTUR"
 DEFAULT_BRANCH="main"
 REPO_URL="https://github.com/LucasBolla94/agent.git"
-INSTALL_DIR="/opt/agenttur"
+INSTALL_DIR=""
 
 banner() {
   cat <<'EOF'
@@ -61,6 +61,14 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ -z "$INSTALL_DIR" ]]; then
+  if [[ "$(id -u)" -eq 0 ]]; then
+    INSTALL_DIR="/opt/agenttur"
+  else
+    INSTALL_DIR="$HOME/agenttur"
+  fi
+fi
 
 if [[ -z "$REPO_URL" ]]; then
   echo "Missing --repo <git_url>"
@@ -159,8 +167,12 @@ if [[ -d "$INSTALL_DIR" ]]; then
   fi
 else
   say "Criando pasta: $INSTALL_DIR"
-  sudo mkdir -p "$INSTALL_DIR"
-  sudo chown "$USER":"$USER" "$INSTALL_DIR"
+  if [[ "$(id -u)" -eq 0 ]]; then
+    mkdir -p "$INSTALL_DIR"
+  else
+    sudo mkdir -p "$INSTALL_DIR"
+    sudo chown "$USER":"$USER" "$INSTALL_DIR"
+  fi
   say "Baixando o repositório..."
   git clone --branch "$DEFAULT_BRANCH" "$REPO_URL" "$INSTALL_DIR"
 fi
@@ -172,7 +184,12 @@ npm install
 npm run build
 npm prune --omit=dev
 
-sudo npm install -g .
+if [[ "$(id -u)" -eq 0 ]]; then
+  npm install -g .
+else
+  sudo npm install -g .
+fi
 
 say "Instalação concluída!"
 say "Agora execute: turion setup"
+say "Se precisar entrar na pasta: cd $INSTALL_DIR"
