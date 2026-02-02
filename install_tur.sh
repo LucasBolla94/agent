@@ -85,6 +85,10 @@ if [[ -z "$INSTALL_DIR" ]]; then
   fi
 fi
 
+if [[ ! -t 0 ]]; then
+  NON_INTERACTIVE="true"
+fi
+
 if [[ -z "$REPO_URL" ]]; then
   echo "Missing --repo <git_url>"
   usage
