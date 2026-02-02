@@ -5,6 +5,7 @@ APP_NAME="AgentTUR"
 DEFAULT_BRANCH="main"
 REPO_URL="https://github.com/LucasBolla94/agent.git"
 INSTALL_DIR=""
+TARGET_USER="${SUDO_USER:-$USER}"
 NON_INTERACTIVE="false"
 REINSTALL="false"
 KEEP="false"
@@ -181,7 +182,7 @@ if [[ -d "$INSTALL_DIR" ]]; then
     say "Removendo instalacao antiga..."
     sudo rm -rf "$INSTALL_DIR"
     sudo mkdir -p "$INSTALL_DIR"
-    sudo chown "$USER":"$USER" "$INSTALL_DIR"
+    sudo chown "$TARGET_USER":"$TARGET_USER" "$INSTALL_DIR"
     say "Baixando o repositorio..."
     git clone --branch "$DEFAULT_BRANCH" "$REPO_URL" "$INSTALL_DIR"
   else
@@ -199,13 +200,14 @@ else
     mkdir -p "$INSTALL_DIR"
   else
     sudo mkdir -p "$INSTALL_DIR"
-    sudo chown "$USER":"$USER" "$INSTALL_DIR"
+    sudo chown "$TARGET_USER":"$TARGET_USER" "$INSTALL_DIR"
   fi
   say "Baixando o repositorio..."
   git clone --branch "$DEFAULT_BRANCH" "$REPO_URL" "$INSTALL_DIR"
 fi
 
 cd "$INSTALL_DIR"
+sudo chown -R "$TARGET_USER":"$TARGET_USER" "$INSTALL_DIR"
 npm config set fund false
 npm config set audit false
 npm install
