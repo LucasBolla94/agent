@@ -3,7 +3,7 @@ set -euo pipefail
 
 APP_NAME="AgentTUR"
 DEFAULT_BRANCH="main"
-REPO_URL=""
+REPO_URL="https://github.com/LucasBolla94/agent.git"
 INSTALL_DIR="/opt/agenttur"
 
 usage() {
@@ -125,6 +125,7 @@ fi
 cd "$INSTALL_DIR"
 npm install
 npm run build
+npm prune --omit=dev
 
 sudo npm install -g .
 
