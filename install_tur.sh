@@ -9,6 +9,11 @@ TARGET_USER="${SUDO_USER:-$USER}"
 NON_INTERACTIVE="false"
 REINSTALL="false"
 KEEP="false"
+SAFE_DIR="${HOME}"
+
+if ! pwd >/dev/null 2>&1; then
+  cd "$SAFE_DIR"
+fi
 
 banner() {
   cat <<'EOF'
@@ -169,6 +174,9 @@ detect_and_install
 
 if [[ -d "$INSTALL_DIR" ]]; then
   say "Pasta encontrada: $INSTALL_DIR"
+  if [[ "$(pwd -P)" == "$INSTALL_DIR"* ]]; then
+    cd "$SAFE_DIR"
+  fi
   if [[ "$REINSTALL" == "true" ]]; then
     choice="1"
   elif [[ "$KEEP" == "true" ]]; then
