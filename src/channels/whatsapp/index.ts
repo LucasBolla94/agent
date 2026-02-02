@@ -11,6 +11,13 @@ import fs from "node:fs";
 
 const QR_REFRESH_MS = 60_000;
 const RECONNECT_MS = 3_000;
+const NOISY_LOG_PATTERNS = [
+  /Closing open session/i,
+  /Closing session: SessionEntry/i,
+  /Decrypted message with closed session/i,
+  /Failed to decrypt message with any known session/i,
+  /Bad MAC/i
+];
 
 export async function startWhatsAppChannel(
   router: Router,
@@ -25,6 +32,7 @@ async function runSocket(
   authDir: string,
   authNumbers: string[]
 ): Promise<void> {
+  const restoreConsole = installLogFilter(NOISY_LOG_PATTERNS);
   const { state, saveCreds } = await useMultiFileAuthState(authDir);
   const { version } = await fetchLatestBaileysVersion();
 
@@ -125,6 +133,11 @@ async function runSocket(
   });
 
   console.log("WhatsApp pronto. Se aparecer QR, escaneie com o celular.");
+  sock.ev.on("connection.update", (update) => {
+    if (update.connection === "open") {
+      restoreConsole();
+    }
+  });
 }
 
 function extractText(message: unknown): string | null {
@@ -176,4 +189,43 @@ function resetAuth(authDir: string): void {
     const message = err instanceof Error ? err.message : "unknown";
     console.log(`Falha ao limpar sessao do WhatsApp: ${message}`);
   }
+}
+
+function installLogFilter(patterns: RegExp[]): () => void {
+  const originalLog = console.log;
+  const originalWarn = console.warn;
+  const originalError = console.error;
+  const originalStdout = process.stdout.write.bind(process.stdout);
+  const originalStderr = process.stderr.write.bind(process.stderr);
+
+  const shouldSuppress = (msg: string): boolean => patterns.some((p) => p.test(msg));
+
+  const filter = (fn: (...args: unknown[]) => void) => (...args: unknown[]) => {
+    const text = args.map((a) => String(a)).join(" ");
+    if (shouldSuppress(text)) return;
+    fn(...args);
+  };
+
+  console.log = filter(originalLog);
+  console.warn = filter(originalWarn);
+  console.error = filter(originalError);
+
+  const filterWrite =
+    (writeFn: (chunk: any, encoding?: any, cb?: any) => boolean) =>
+    (chunk: any, encoding?: any, cb?: any) => {
+      const text = typeof chunk === "string" ? chunk : chunk?.toString?.() ?? "";
+      if (shouldSuppress(text)) return true;
+      return writeFn(chunk, encoding, cb);
+    };
+
+  process.stdout.write = filterWrite(originalStdout) as typeof process.stdout.write;
+  process.stderr.write = filterWrite(originalStderr) as typeof process.stderr.write;
+
+  return () => {
+    console.log = originalLog;
+    console.warn = originalWarn;
+    console.error = originalError;
+    process.stdout.write = originalStdout;
+    process.stderr.write = originalStderr;
+  };
 }
