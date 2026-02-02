@@ -14,6 +14,8 @@ async function bootstrap(): Promise<void> {
 
   const router = new Router(registry, logger, env.authNumbers);
 
+  setupSignalHandlers();
+
   if (env.enableWhatsapp) {
     await startWhatsAppChannel(router, env.waAuthDir, env.authNumbers);
   }
@@ -36,3 +38,14 @@ bootstrap().catch((err) => {
   console.error("Fatal error:", err);
   process.exit(1);
 });
+
+function setupSignalHandlers(): void {
+  process.on("SIGINT", () => {
+    console.log("\nEncerrando com segurança. Até logo!");
+    process.exit(0);
+  });
+  process.on("SIGTERM", () => {
+    console.log("Encerrando com segurança. Até logo!");
+    process.exit(0);
+  });
+}

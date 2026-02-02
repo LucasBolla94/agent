@@ -1,13 +1,23 @@
 import makeWASocket, {
   fetchLatestBaileysVersion,
   useMultiFileAuthState,
-  getContentType
+  getContentType,
+  DisconnectReason
 } from "@whiskeysockets/baileys";
 import pino from "pino";
 import qrcode from "qrcode-terminal";
 import type { Router } from "../../core/router.js";
+import fs from "node:fs";
 
 export async function startWhatsAppChannel(
+  router: Router,
+  authDir: string,
+  authNumbers: string[]
+): Promise<void> {
+  await runSocket(router, authDir, authNumbers);
+}
+
+async function runSocket(
   router: Router,
   authDir: string,
   authNumbers: string[]
@@ -25,15 +35,26 @@ export async function startWhatsAppChannel(
   sock.ev.on("connection.update", async (update) => {
     const { connection, lastDisconnect, qr } = update;
     if (qr) {
-      console.log("QR Code para conexão WhatsApp:");
+      console.log("QR Code para conexao WhatsApp (escaneie com o celular):");
       qrcode.generate(qr, { small: true });
     }
     if (connection === "close") {
-      const reason = (lastDisconnect?.error as { message?: string })?.message ?? "unknown";
-      console.log(`WhatsApp connection closed: ${reason}`);
+      const statusCode = (lastDisconnect?.error as { output?: { statusCode?: number } })?.output
+        ?.statusCode;
+      if (statusCode === DisconnectReason.loggedOut) {
+        console.log("WhatsApp desconectado pelo telefone. Gerando novo QR...");
+        resetAuth(authDir);
+        setTimeout(() => {
+          runSocket(router, authDir, authNumbers).catch((err) => {
+            console.log(`Falha ao reiniciar WhatsApp: ${String(err)}`);
+          });
+        }, 1500);
+        return;
+      }
+      console.log("Conexao com WhatsApp perdida. Tentando reconectar...");
     }
     if (connection === "open") {
-      console.log("WhatsApp connected.");
+      console.log("WhatsApp conectado.");
       await notifyAuthorizedUsers(sock, authNumbers);
     }
   });
@@ -58,7 +79,7 @@ export async function startWhatsAppChannel(
     }
   });
 
-  console.log("WhatsApp channel ready. Scan the QR code if prompted.");
+  console.log("WhatsApp pronto. Se aparecer QR, escaneie com o celular.");
 }
 
 function extractText(message: unknown): string | null {
@@ -95,5 +116,19 @@ async function notifyAuthorizedUsers(
       const message = err instanceof Error ? err.message : "unknown";
       console.log(`Falha ao notificar ${number}: ${message}`);
     }
+  }
+}
+
+function resetAuth(authDir: string): void {
+  try {
+    if (fs.existsSync(authDir)) {
+      fs.rmSync(authDir, { recursive: true, force: true });
+      fs.mkdirSync(authDir, { recursive: true });
+    } else {
+      fs.mkdirSync(authDir, { recursive: true });
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown";
+    console.log(`Falha ao limpar sessao do WhatsApp: ${message}`);
   }
 }
